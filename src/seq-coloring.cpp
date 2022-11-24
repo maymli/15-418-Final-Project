@@ -3,7 +3,7 @@
 
 class SeqColorGraph : public ColorGraph {
 public:
-  void buildGraph(std::vector<graphNode> nodes, std::vector<std::pair<int, int>> pairs) {
+  void buildGraph(std::vector<graphNode> &nodes, std::vector<std::pair<int, int>> &pairs) {
     for (auto &node : nodes) {
       graph[node] = {};
     }
