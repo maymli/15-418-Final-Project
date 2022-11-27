@@ -10,7 +10,7 @@
 
 
 // can add more Sequential Types
-enum class ColoringType { Sequential };
+enum class ColoringType { Sequential, OpenMP };
 
 struct StartupOptions {
   std::string inputFile = "";
@@ -24,6 +24,8 @@ StartupOptions parseOptions(int argc, const char **argv) {
       so.inputFile = argv[i+1];
     } else if (strcmp(argv[i], "-seq") == 0) {
       so.coloringType = ColoringType::Sequential;
+    } else if (strcmp(argv[i], "-openmp") == 0) {
+      so.coloringType = ColoringType::OpenMP;
     }
   }
   return so;
@@ -99,6 +101,9 @@ int main(int argc, const char **argv) {
   switch (options.coloringType) {
     case ColoringType::Sequential:
       cg = createSeqColorGraph();
+      break;
+    case ColoringType::OpenMP:
+      cg = createOpenMPColorGraph();
   }
 
   Timer t;
