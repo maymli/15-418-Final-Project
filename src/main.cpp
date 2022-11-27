@@ -1,4 +1,5 @@
 #include "graph.h"
+#include "timing.h"
 
 #include <algorithm>
 #include <cstring>
@@ -100,11 +101,18 @@ int main(int argc, const char **argv) {
       cg = createSeqColorGraph();
   }
 
+  Timer t;
+  t.reset();
+
   std::unordered_map<graphNode, std::vector<graphNode>> graph;
   std::unordered_map<graphNode, color> colors;
   cg->buildGraph(nodes, pairs, graph);
   cg->colorGraph(graph, colors);
 
+  double time_spent = t.elapsed();
+  std::cout.setf(std::ios::fixed, std::ios::floatfield);
+  std::cout.precision(5);
+  std::cout << "Time spent: " << time_spent << std::endl;
   if (!checkCorrectness(nodes, graph, colors)) {
     std::cout << "Failed to color graph correctly\n";
     return -1;
