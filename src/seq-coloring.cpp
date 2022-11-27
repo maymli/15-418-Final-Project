@@ -3,7 +3,8 @@
 
 class SeqColorGraph : public ColorGraph {
 public:
-  void buildGraph(std::vector<graphNode> &nodes, std::vector<std::pair<int, int>> &pairs) {
+  void buildGraph(std::vector<graphNode> &nodes, std::vector<std::pair<int, int>> &pairs,
+                  std::unordered_map<graphNode, std::vector<graphNode>> &graph) {
     for (auto &node : nodes) {
       graph[node] = {};
     }
@@ -14,7 +15,8 @@ public:
     }
   }
 
-  int firstAvailableColor(int node, std::unordered_map<graphNode, color> &colors) {
+  int firstAvailableColor(int node, std::unordered_map<graphNode, std::vector<graphNode>> &graph,
+                          std::unordered_map<graphNode, color> &colors) {
     std::unordered_set<int> usedColors;
     for (const auto &nbor : graph[node]) {
       if (colors.count(nbor) > 0) {
@@ -31,14 +33,16 @@ public:
     }
   }
 
-  void colorGraph(std::unordered_map<graphNode, color> &colors) {
+  void colorGraph(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
+                  std::unordered_map<graphNode, color> &colors) {
     int graphSize = (int) graph.size();
     for (const auto &node : graph) {
-      int color = firstAvailableColor(node.first, colors);
+      int color = firstAvailableColor(node.first, graph, colors);
       colors[node.first] = color;
     }
   }
 };
 
-int main() {
+std::unique_ptr<ColorGraph> createSeqColorGraph() {
+  return std::make_unique<SeqColorGraph>();
 }

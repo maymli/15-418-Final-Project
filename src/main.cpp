@@ -1,5 +1,10 @@
 #include "graph.h"
+
+#include <algorithm>
 #include <cstring>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
 
 
@@ -44,10 +49,73 @@ bool checkCorrectness(std::vector<graphNode> &nodes,
   return true;
 }
 
+bool readGraphFromFile(std::string fileName, std::vector<graphNode> &nodes,
+                            std::vector<std::pair<graphNode, graphNode>> &pairs) {
+  std::ifstream inFile;
+
+  inFile.open(fileName);
+  if (!inFile) {
+    return false;
+  }
+
+  std::string line;
+
+  std::getline(inFile, line);
+  std::stringstream sstream(line);
+  std::string str;
+  std::getline(sstream, str, '\n');
+  int numVertices = (int) atoi(str.c_str());
+
+  for (int i = 0; i < numVertices; i++) {
+    nodes.push_back(i);
+  }
+
+  while(std::getline(inFile, line)) {
+    std::stringstream sstream2(line);
+    std::getline(sstream2, str, ' ');
+    int v1 = (int) atoi(str.c_str());
+    std::getline(sstream2, str, '\n');
+    int v2 = (int) atoi(str.c_str());
+
+    pairs.push_back(std::make_pair(v1, v2));
+  }
+
+  return true;
+}
+
 int main(int argc, const char **argv) {
   StartupOptions options = parseOptions(argc, argv);
 
   // TODO: add a read nodes + pairs from file option here
-  
+  std::vector<graphNode> nodes;
+  std::vector<std::pair<graphNode, graphNode>> pairs;
+  if (!readGraphFromFile(options.inputFile, nodes, pairs)) {
+    std::cerr << "Failed to read graph from input file\n";
+  }
+
+  std::unique_ptr<ColorGraph> cg;
+
+  switch (options.coloringType) {
+    case ColoringType::Sequential:
+      cg = createSeqColorGraph();
+  }
+
+  std::unordered_map<graphNode, std::vector<graphNode>> graph;
+  std::unordered_map<graphNode, color> colors;
+  cg->buildGraph(nodes, pairs, graph);
+  cg->colorGraph(graph, colors);
+
+  if (!checkCorrectness(nodes, graph, colors)) {
+    std::cout << "Failed to color graph correctly\n";
+    return -1;
+  } else {
+    std::cout << "Graph coloring succeeded, colored with ";
+    int max = 0;
+    for (auto &color : colors) {
+      max = std::max(max, color.second);
+    }
+    std::cout << max + 1 << " colors\n"; 
+  }
+
   return 0;
 }
