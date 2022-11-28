@@ -23,9 +23,9 @@ f1.close()
 
 f1 = open("sparse-50000.txt", "w")
 f1.write("50000\n")
-for _ in range(5000000):
-    first = random.randrange(0, 50000)
-    second = random.randrange(0, 50000)
+for _ in range(2500000):
+    first = random.randrange(0, 5000)
+    second = random.randrange(0, 5000)
     if first != second:
         f1.write(str(first) + " " + str(second) + "\n")
 f1.close()
