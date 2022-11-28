@@ -86,6 +86,21 @@ bool readGraphFromFile(std::string fileName, std::vector<graphNode> &nodes,
   return true;
 }
 
+void createCompleteTest(std::vector<graphNode> &nodes,
+                        std::vector<std::pair<graphNode, graphNode>> &pairs) {
+  int numNodes = 5000;
+  nodes.resize(numNodes);
+  for (int i = 0; i < numNodes; i++) {
+    nodes[i] = i;
+  }
+  pairs.clear();
+  for (int i = 0; i < numNodes; i++) {
+    for (int j = i + 1; j < numNodes; j++) {
+      pairs.push_back(std::make_pair(i, j));
+    }
+  }
+}
+
 int main(int argc, const char **argv) {
   StartupOptions options = parseOptions(argc, argv);
 
