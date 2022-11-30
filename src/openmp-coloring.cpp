@@ -13,11 +13,14 @@ public:
     }
   
     size_t numPairs = pairs.size();
-    // #pragma omp parallel for shared(pairs, graph)
+
+    // #pragma omp parallel for schedule(static, 1) shared(pairs, graph)
     for (size_t i = 0; i < numPairs; i++) {
       int first = pairs[i].first;
       int second = pairs[i].second;
+
       graph[first].push_back(second);
+
       graph[second].push_back(first);
     }
   }
@@ -26,7 +29,7 @@ public:
                           std::unordered_map<graphNode, color> &colors) {
     std::unordered_set<int> usedColors;
     for (const auto &nbor : graph[node]) {
-      if (colors.count(nbor) > 0) {
+      if (nbor < node && colors.count(nbor) > 0) {
         usedColors.insert(colors[nbor]);
       }
     }
@@ -54,7 +57,7 @@ public:
       colors[i] = -1;
     }
 
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(dynamic, 12)
     for (int i = 0; i < numNodes; i++) { // take advantage of nodes that are [0, numNodes)
       int color = firstAvailableColor(i, graph, colors);
       colors[i] = color;
@@ -70,10 +73,8 @@ public:
       int color = colors[i];
       for (auto &nbor : graph[i]) {
         if (color == colors[nbor]) {
-          colors[i] = numColors;
-          
-          #pragma omp atomic
-          numColors += 1;
+          #pragma omp atomic capture
+          colors[i] = numColors++;
           break;
         }
       }

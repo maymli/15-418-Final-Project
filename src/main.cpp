@@ -108,7 +108,8 @@ int main(int argc, const char **argv) {
   std::vector<graphNode> nodes;
   std::vector<std::pair<graphNode, graphNode>> pairs;
   if (!readGraphFromFile(options.inputFile, nodes, pairs)) {
-    std::cerr << "Failed to read graph from input file\n";
+    createCompleteTest(nodes, pairs);
+    // std::cerr << "Failed to read graph from input file\n";
   }
 
   std::unique_ptr<ColorGraph> cg;
@@ -137,7 +138,7 @@ int main(int argc, const char **argv) {
     std::cout << "Failed to color graph correctly\n";
     return -1;
   } else {
-    std::cout << "Graph coloring succeeded, colored with ";
+    std::cout << "Colored with ";
     int max = 0;
     for (auto &color : colors) {
       max = std::max(max, color.second);
