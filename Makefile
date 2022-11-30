@@ -8,12 +8,22 @@ endif
 
 ifeq (debug,$(CONFIGURATION))
 CFLAGS += -g
+else ifeq (MPI, $(CONFIGURATION))
+CFLAGS += -O2
 else
 CFLAGS += -O2 -fopenmp
 endif
 
+ifeq (MPI, $(CONFIGURATION))
+SOURCES = src/openmpi-coloring.cpp
+else
 SOURCES := src/*.cpp
+endif
 HEADERS := src/*.h
+
+ifeq (MPI, $(CONFIGURATION))
+CXX = mpic++
+endif
 
 TARGETBIN := color-$(CONFIGURATION)
 
