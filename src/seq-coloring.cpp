@@ -35,10 +35,10 @@ public:
 
   void colorGraph(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
                   std::unordered_map<graphNode, color> &colors) {
-    int graphSize = (int) graph.size();
-    for (const auto &node : graph) {
-      int color = firstAvailableColor(node.first, graph, colors);
-      colors[node.first] = color;
+    int numNodes = (int) graph.size();
+    for (int i = 0; i < numNodes; i++) {
+      int color = firstAvailableColor(i, graph, colors);
+      colors[i] = color;
     }
   }
 };
