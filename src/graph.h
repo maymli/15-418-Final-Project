@@ -20,3 +20,4 @@ class ColorGraph {
 
 std::unique_ptr<ColorGraph> createSeqColorGraph();
 std::unique_ptr<ColorGraph> createOpenMPColorGraph();
+std::unique_ptr<ColorGraph> createJPOpenMPColorGraph();

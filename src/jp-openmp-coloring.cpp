@@ -1,17 +1,21 @@
 #include <algorithm>
+#include <iostream>
 #include <unordered_set>
 #include "graph.h"
 
-class OpenMPColorGraph : public ColorGraph {
+class JPOpenMPColorGraph : public ColorGraph {
 public:
   void buildGraph(std::vector<graphNode> &nodes, std::vector<std::pair<int, int>> &pairs,
                   std::unordered_map<graphNode, std::vector<graphNode>> &graph) {
+    // note: I don't think you can actually parallelize this part?
+    // #pragma omp parallel for shared(nodes, graph)
     for (auto &node : nodes) {
       graph[node] = {};
     }
   
     size_t numPairs = pairs.size();
 
+    // #pragma omp parallel for schedule(static, 1) shared(pairs, graph)
     for (size_t i = 0; i < numPairs; i++) {
       int first = pairs[i].first;
       int second = pairs[i].second;
@@ -26,7 +30,7 @@ public:
                           std::unordered_map<graphNode, color> &colors) {
     std::unordered_set<int> usedColors;
     for (const auto &nbor : graph[node]) {
-      if (nbor < node && colors.count(nbor) > 0) {
+      if (colors[nbor] != -1) {
         usedColors.insert(colors[nbor]);
       }
     }
@@ -50,48 +54,35 @@ public:
     // also we'll need to change this into a vector to iterat through with pragma
    
     int numNodes = (int) graph.size(); 
+    std::cout << numNodes << std::endl;
     for (int i = 0; i < numNodes; i++) {
       colors[i] = -1;
     }
 
-    #pragma omp parallel for schedule(dynamic, 12)
-    for (int i = 0; i < numNodes; i++) { // take advantage of nodes that are [0, numNodes)
-      int color = firstAvailableColor(i, graph, colors);
-      colors[i] = color;
-    }
-
-    int numColors = 0;
-    for (int i = 0; i < numNodes; i++) {
-      numColors = std::max(numColors, colors[i] + 1);
-    }
-
-    #pragma omp parallel for shared(graph, colors, numColors)
-    for (int i = 0 ; i < numNodes; i++) {
-      int color = colors[i];
-      for (auto &nbor : graph[i]) {
-        if (color == colors[nbor]) {
-          #pragma omp atomic capture
-          colors[i] = numColors++;
-          break;
+    int numMarked = 0;
+        
+    while (numMarked < numNodes) {
+      #pragma omp parallel for schedule(dynamic, 2) shared(graph, colors, numMarked)
+      for (int i = 0; i < numNodes; i++) {
+        if (colors[i] == -1) {
+          bool colorNow = true;
+          for (const auto &nbor : graph[i]) {
+            if (colors[nbor] == -1 && i < nbor) {
+              colorNow = false;
+              break;
+            }
+          }
+          if (colorNow) {
+            colors[i] = firstAvailableColor(i, graph, colors);
+            #pragma omp atomic
+            numMarked++;
+          }
         }
-      }
-    }
-
-    #pragma omp parallel for shared(graph, colors)
-    for (int i = 0; i < numNodes; i++) {
-      int maxNbor = -1;
-      int maxColor = -1;
-      for (auto &nbor : graph[i]) {
-        maxNbor = std::max(maxNbor, nbor);
-        maxColor = std::max(maxColor, colors[nbor]);
-      }
-      if (maxNbor < i && maxColor < colors[i]) {
-        colors[i] = maxColor + 1;
       }
     }
   }
 };
 
-std::unique_ptr<ColorGraph> createOpenMPColorGraph() {
-  return std::make_unique<OpenMPColorGraph>();
+std::unique_ptr<ColorGraph> createJPOpenMPColorGraph() {
+  return std::make_unique<JPOpenMPColorGraph>();
 }
