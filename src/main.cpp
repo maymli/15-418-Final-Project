@@ -10,7 +10,7 @@
 
 
 // can add more Sequential Types
-enum class ColoringType { Sequential, OpenMP };
+enum class ColoringType { Sequential, OpenMP, JPOpenMP, HalfJP };
 
 struct StartupOptions {
   std::string inputFile = "";
@@ -26,6 +26,10 @@ StartupOptions parseOptions(int argc, const char **argv) {
       so.coloringType = ColoringType::Sequential;
     } else if (strcmp(argv[i], "-openmp") == 0) {
       so.coloringType = ColoringType::OpenMP;
+    } else if (strcmp(argv[i], "-jpop") == 0) {
+      so.coloringType = ColoringType::JPOpenMP;
+    } else if (strcmp(argv[i], "-half") == 0) {
+      so.coloringType = ColoringType::HalfJP;
     }
   }
   return so;
@@ -39,6 +43,7 @@ bool checkCorrectness(std::vector<graphNode> &nodes,
       return false;
 
     color curr = colors[node];
+    if (curr == -1) std::cout << "Negative color\n";
 
     for (auto &nbor : graph[node]) {
       if (colors.count(nbor) == 0) {
@@ -120,30 +125,38 @@ int main(int argc, const char **argv) {
       break;
     case ColoringType::OpenMP:
       cg = createOpenMPColorGraph();
+      break;
+    case ColoringType::JPOpenMP:
+      cg = createJPOpenMPColorGraph();
+      break;
+    case ColoringType::HalfJP:
+      cg = createHalfJPOpenMPColorGraph();
+      break;
+
   }
 
   Timer t;
-  t.reset();
 
   std::unordered_map<graphNode, std::vector<graphNode>> graph;
   std::unordered_map<graphNode, color> colors;
   cg->buildGraph(nodes, pairs, graph);
+  t.reset();
   cg->colorGraph(graph, colors);
 
   double time_spent = t.elapsed();
   std::cout.setf(std::ios::fixed, std::ios::floatfield);
   std::cout.precision(5);
   std::cout << "Time spent: " << time_spent << std::endl;
+  std::cout << "Colored with ";
+  int max = 0;
+  for (auto &color : colors) {
+    max = std::max(max, color.second);
+  }
+  std::cout << max + 1 << " colors\n"; 
+
   if (!checkCorrectness(nodes, graph, colors)) {
     std::cout << "Failed to color graph correctly\n";
     return -1;
-  } else {
-    std::cout << "Colored with ";
-    int max = 0;
-    for (auto &color : colors) {
-      max = std::max(max, color.second);
-    }
-    std::cout << max + 1 << " colors\n"; 
   }
 
   return 0;
