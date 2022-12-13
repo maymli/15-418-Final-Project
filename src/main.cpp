@@ -10,7 +10,7 @@
 
 
 // can add more Sequential Types
-enum class ColoringType { Sequential, OpenMP, JPOpenMP };
+enum class ColoringType { Sequential, OpenMP, JPOpenMP, HalfJP };
 
 struct StartupOptions {
   std::string inputFile = "";
@@ -28,6 +28,8 @@ StartupOptions parseOptions(int argc, const char **argv) {
       so.coloringType = ColoringType::OpenMP;
     } else if (strcmp(argv[i], "-jpop") == 0) {
       so.coloringType = ColoringType::JPOpenMP;
+    } else if (strcmp(argv[i], "-half") == 0) {
+      so.coloringType = ColoringType::HalfJP;
     }
   }
   return so;
@@ -126,6 +128,10 @@ int main(int argc, const char **argv) {
       break;
     case ColoringType::JPOpenMP:
       cg = createJPOpenMPColorGraph();
+      break;
+    case ColoringType::HalfJP:
+      cg = createHalfJPOpenMPColorGraph();
+      break;
 
   }
 
