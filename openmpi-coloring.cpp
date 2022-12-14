@@ -271,12 +271,13 @@ int main(int argc, char *argv[]) {
   Timer t;
   t.reset();
 
-  // Broadcast number of nodes and pairs of nodes
-  int numNodes = (int) nodes.size();
-  MPI_Bcast(&numNodes, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+  MPI_Datatype MPI_PAIR;
+  MPI_Type_contiguous(2, MPI_INT, &MPI_PAIR);
+  MPI_Type_commit(&MPI_PAIR);
 
-  int numPairs = (int) pairs.size();
-  MPI_Bcast(&numPairs, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+  // Broadcast nodes and pairs from head to task processes
+  MPI_Bcast(&nodes[0], numNodes, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&pairs[0], numPairs, MPI_PAIR, 0, MPI_COMM_WORLD);
 
   // Resize task processes' variables
   if (pid != 0) {
