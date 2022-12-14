@@ -24,7 +24,19 @@ HEADERS := src/*.h
 ifeq (MPI, $(CONFIGURATION))
 CXX = mpic++
 endif
- 
+
+ifeq (MPI2, $(CONFIGURATION))
+SOURCES = synch-openmpi-coloring.cpp
+else
+SOURCES := src/*.cpp
+endif
+HEADERS := src/*.h
+
+ifeq (MPI2, $(CONFIGURATION))
+CXX = mpic++
+endif
+
+
 TARGETBIN := color-$(CONFIGURATION)
 
 .SUFFIXES:
