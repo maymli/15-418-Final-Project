@@ -130,11 +130,6 @@ int main(int argc, char *argv[]) {
     readGraphFromFile(options.inputFile, nodes, pairs);
   }
 
-  // Start timer
-  MPI_Barrier(MPI_COMM_WORLD);
-  Timer t;
-  t.reset();
-
   // Broadcast number of nodes and pairs of nodes
   int numNodes = (int) nodes.size();
   MPI_Bcast(&numNodes, 1, MPI_INT, 0, MPI_COMM_WORLD); 
@@ -165,6 +160,11 @@ int main(int argc, char *argv[]) {
   
   // Each processor has nodes + graph now
   // TODO: assume num nodes divisible by num procs for now, fix remainder later
+
+  // Start timer
+  MPI_Barrier(MPI_COMM_WORLD);
+  Timer t;
+  t.reset();
   
   #pragma region partition
   // using "natural" ordering (has implicit mapping of nodes to processors)
@@ -204,9 +204,16 @@ int main(int argc, char *argv[]) {
   std::vector<int> unfinishedProcessors;
   unfinishedProcessors.resize(nproc);
   int unfinished = 1;
+  
+  std::unordered_set<int> otherPids;
+  for (int proc = 0; proc < nproc; proc ++) {
+    if (proc != pid) {
+      otherPids.insert(proc);
+    }
+  }
 
   while (unfinished != 0) {
-    // if (nodesToColor.size() > 0) {
+    if (nodesToColor.size() > 0) {
     std::vector<graphNode> boundaryNodes;
 
     // for each superstep
@@ -236,55 +243,45 @@ int main(int argc, char *argv[]) {
 
       #pragma region communication
       // send over number of boundary nodes that will be sent
-      for (int proc = 0; proc < nproc; proc ++) {
-        if (proc != pid) {
-          int numNew = colorsToSend[proc].size();
-          MPI_Request numColors;
-          MPI_Isend(&numNew, 1, MPI_INT, proc, 0, MPI_COMM_WORLD, &numColors); // tag is 0, doesn't matter
-        }
+      for (auto proc : otherPids) {
+        int numNew = colorsToSend[proc].size();
+        MPI_Request numColors;
+        MPI_Isend(&numNew, 1, MPI_INT, proc, 0, MPI_COMM_WORLD, &numColors); // tag is 0, doesn't matter
       }
       // receive number of boundary nodes that will be received
       std::vector<int> numsNew;
       numsNew.resize(nproc);
-      for (int proc = 0; proc < nproc; proc ++) {
-        if (proc != pid) {
-          MPI_Status status;
-          MPI_Recv(&numsNew[proc], 1, MPI_INT, proc, 0, MPI_COMM_WORLD, &status); // tag is 0, doesn't matter
-        }
+      for (auto proc : otherPids) {
+        MPI_Status status;
+        MPI_Recv(&numsNew[proc], 1, MPI_INT, proc, 0, MPI_COMM_WORLD, &status); // tag is 0, doesn't matter
       }
       // TODO: try doing IRecv and Waitall?
       
       // actually send over the boundary nodes
-      for (int proc = 0; proc < nproc; proc ++) {
-        if (proc != pid) {
-          MPI_Request newColors;
-          MPI_Isend(&colorsToSend[proc][0], colorsToSend[proc].size(), MPI_INT, proc, 0, MPI_COMM_WORLD, &newColors); // tag is 0, doesn't matter
-        }
+      for (auto proc : otherPids) {
+        MPI_Request newColors;
+        MPI_Isend(&colorsToSend[proc][0], colorsToSend[proc].size(), MPI_INT, proc, 0, MPI_COMM_WORLD, &newColors); // tag is 0, doesn't matter
       }
 
       std::vector<std::vector<int>> newColors;
       newColors.resize(nproc);
-      for (int proc = 0; proc < nproc; proc ++) {
+      for (auto proc : otherPids) {
         newColors[proc].resize(numsNew[proc]);
       }
       // receive the boundary nodes
-      for (int proc = 0; proc < nproc; proc ++) {
-        if (proc != pid) {
-          MPI_Status status;
-          MPI_Recv(&newColors[proc][0], numsNew[proc], MPI_INT, proc, 0, MPI_COMM_WORLD, &status); // tag is 0, doesn't matter
-        }
+      for (auto proc : otherPids) {
+        MPI_Status status;
+        MPI_Recv(&newColors[proc][0], numsNew[proc], MPI_INT, proc, 0, MPI_COMM_WORLD, &status); // tag is 0, doesn't matter
       }
       #pragma endregion
 
       // update boundary node neighbors w/ new colors
-      for (int proc = 0; proc < nproc; proc ++) {
-        if (proc != pid) {
-          int numColors = newColors[proc].size();
-          for (int i = 0; i < numColors; i += 2) {
-            int node = newColors[proc][i];
-            int color = newColors[proc][i + 1];
-            colors[node] = color;
-          }
+      for (auto proc : otherPids) {
+        int numColors = newColors[proc].size();
+        for (int i = 0; i < numColors; i += 2) {
+          int node = newColors[proc][i];
+          int color = newColors[proc][i + 1];
+          colors[node] = color;
         }
       }
     }
@@ -293,10 +290,11 @@ int main(int argc, char *argv[]) {
     std::unordered_set<int> added;
     std::vector<graphNode> nodesToRecolor;
 
+    //std::cerr << "\nP" << pid << ": boundary nodes = " << boundaryNodes.size() << "\n";
     for (auto node : boundaryNodes) {
       for (auto nbor : graph[node]) {
         if (colors[node] == colors[nbor]) {
-          if (node < nbor) { // TODO: use a different pseudorandom function
+          if (node + 23 % 5 < nbor + 23 % 5) { // TODO: use a different pseudorandom function
             if (added.find(node) == added.end()) {
               added.insert(node);
               nodesToRecolor.push_back(node);
@@ -306,18 +304,31 @@ int main(int argc, char *argv[]) {
       }
     }
     nodesToColor.swap(nodesToRecolor);
-    //}
+    }
 
     #pragma region check
     // Check to see if all processors are finished!
     unfinished = nodesToColor.size(); // 0 if finished, > 0 if unfinished!
-    MPI_Allgather(&unfinished, 1, MPI_INT, &unfinishedProcessors[0], 1, MPI_INT, MPI_COMM_WORLD);
-    // std::cerr << "P" << pid << ": remaining = " << unfinished << "\n";
-    if (!unfinished) {
-      for (auto unfin : unfinishedProcessors) {
-        if (unfin != 0) {
-          unfinished = 1;
-          break;
+
+    //MPI_Allgather(&unfinished, 1, MPI_INT, &unfinishedProcessors[0], 1, MPI_INT, MPI_COMM_WORLD);
+    // send over number of boundary nodes that will be sent
+    for (auto proc : otherPids) {
+      MPI_Request finished;
+      MPI_Isend(&unfinished, 1, MPI_INT, proc, 0, MPI_COMM_WORLD, &finished); // tag is 0, doesn't matter
+    }
+    // receive number of boundary nodes that will be received
+    for (auto proc : otherPids) {
+      MPI_Status status;
+      MPI_Recv(&unfinishedProcessors[proc], 1, MPI_INT, proc, 0, MPI_COMM_WORLD, &status); // tag is 0, doesn't matter
+    }
+    
+    if (!unfinished) { // finished, aka nodesToColor.size() == 0
+      otherPids.clear();
+    }
+    else { // unfinished
+      for (int proc = 0; proc < nproc; proc ++) {
+        if (proc != pid && !unfinishedProcessors[proc]) { // if another proc finished, remove it
+          otherPids.erase(proc);
         }
       }
     }
