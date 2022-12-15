@@ -63,16 +63,20 @@ bool checkCorrectness(std::vector<graphNode> &nodes,
                       std::unordered_map<graphNode, std::vector<graphNode>> &graph,
                       std::unordered_map<graphNode, color> &colors) {
   for (auto &node : nodes) {
-    if (colors.count(node) == 0)
+    if (colors.count(node) == 0 || colors[node] == -1) {
+      std::cout << "missing color for " << node << std::endl;
       return false;
+    }
 
     color curr = colors[node];
 
     for (auto &nbor : graph[node]) {
       if (colors.count(nbor) == 0) {
+        std::cout << "missing color for " << nbor << std::endl;
         return false;
       }
       if (colors[nbor] == curr) {
+        std::cout << "same color " << curr << " for " << node << " and " << nbor << std::endl;
         return false;
       }
     }
@@ -82,13 +86,41 @@ bool checkCorrectness(std::vector<graphNode> &nodes,
 
 void buildGraph(std::vector<graphNode> &nodes, std::vector<std::pair<int, int>> &pairs,
                   std::unordered_map<graphNode, std::vector<graphNode>> &graph) {
+  std::unordered_map<graphNode, std::unordered_set<graphNode>> edges;
   for (auto &node : nodes) {
     graph[node] = {};
+    edges[node] = {};
   }
 
   for (auto &pair : pairs) {
-    graph[pair.first].push_back(pair.second);
-    graph[pair.second].push_back(pair.first);
+    if (edges[pair.first].count(pair.second) == 0) {
+      graph[pair.first].push_back(pair.second);
+      graph[pair.second].push_back(pair.first);
+
+      edges[pair.first].insert(pair.second);
+      edges[pair.second].insert(pair.first);
+    }
+  }
+}
+
+void reorder(int startNode, int endNode, std::unordered_map<graphNode, std::vector<graphNode>> &graph,
+      std::vector<graphNode> &order) {
+  std::unordered_map<graphNode, graphNode> sums;
+  for (int i = startNode; i < endNode; i++) {
+    sums[i] = 0;
+    for (const auto &nbor : graph[i]) {
+      if (nbor >= endNode) {
+        sums[i] += 1;
+      }
+    }
+  }
+  std::vector<std::pair<graphNode, int>> pairs(sums.begin(), sums.end());
+  std::sort(pairs.begin(), pairs.end(), 
+                  [] (const std::pair<graphNode, int> &lhs, const std::pair<graphNode, int> &rhs) {
+                    return lhs.second < rhs.second;
+                  });
+  for (const auto &pair : pairs) {
+    order.emplace_back(pair.first);
   }
 }
 
@@ -96,7 +128,7 @@ int firstAvailableColor(int node, std::unordered_map<graphNode, std::vector<grap
                         std::unordered_map<graphNode, color> &colors) {
     std::unordered_set<int> usedColors;
     for (const auto &nbor : graph[node]) {
-        if (colors.count(nbor) > 0) {
+        if (colors[nbor] != -1) {
             usedColors.insert(colors[nbor]);
         }
     }
@@ -114,47 +146,184 @@ int nodeToProc(graphNode node, int totalNodes, int nproc) {
   return (int) (node / (((float) totalNodes) / nproc));
 }
 
-std::unordered_map<graphNode, color> colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph, 
+/* void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
+                std::unordered_map<graphNode, color> &colors,
                 int pid, int nproc, int totalNodes) {
   
-  std::unordered_map<graphNode, color> colors;
   int startNode = pid * (((float) totalNodes) / nproc);
   int endNode = (pid + 1) * (((float) totalNodes) / nproc);
-  std::cout << startNode << ", " << endNode << std::endl;
+  std::vector<MPI_Request> requests;
+  requests.resize(totalNodes);
+  int numReqs = 0;
+  int numWait = 0;
 
-  for (int node = startNode; node < endNode; node++) {
+  // map pids to sets they need
+  
+  std::vector<graphNode> order;
+  reorder(startNode, endNode, graph, order);
+
+ // for (int node = startNode; node < endNode; node++) {
+ for (auto &node : order) {
     std::vector<graphNode> smallerNbors;
     std::vector<graphNode> largerNbors;
     for (const auto &nbor : graph[node]) {
-      if (nbor < startNode || nbor > endNode) {
-        if (node < nbor) {
+      if (nbor < startNode || nbor >= endNode) {
+        if (colors[nbor] == -1 && node < nbor) {
           largerNbors.emplace_back(nbor);
-        } else {
+        } else if (node > nbor) {
           smallerNbors.emplace_back(nbor);
         }
       }
     }
 
     for (const auto &nbor : largerNbors) {
-      MPI_Status status;
-      int color = 0;
-      MPI_Recv(&color, 1, MPI_INT, nodeToProc(nbor, totalNodes, nproc), nbor, MPI_COMM_WORLD, &status);
-      colors[nbor] = color;
+      // MPI_Status status;
+      int color2 = 0;
+      MPI_Recv(&color2, 1, MPI_INT, nodeToProc(nbor, totalNodes, nproc), (int) nbor, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      colors[nbor] = color2;
+      numWait++;
     }
 
     // wait for colors to come in, then assign colors 
     int color = firstAvailableColor(node, graph, colors);
     colors[node] = color;
+    
+    std::vector<bool> sent_pids;
+    sent_pids.resize(nproc, false);
 
     // send color to nbor that needs it and is smaller
     for (const auto &nbor : smallerNbors) {
-      MPI_Request send_req;
-      MPI_Isend(&color, 1, MPI_INT, nodeToProc(nbor, totalNodes, nproc), node, MPI_COMM_WORLD, &send_req);
+      int send_pid = nodeToProc(nbor, totalNodes, nproc);
+      if (!sent_pids[send_pid]) {
+        MPI_Isend(&colors[node], 1, MPI_INT, send_pid, node, MPI_COMM_WORLD, &requests[numReqs++]);
+        sent_pids[send_pid] = true;
+      }
     }
   }
-  return colors;
-}
+
+  MPI_Barrier(MPI_COMM_WORLD);
+} */
+
+void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
+                std::unordered_map<graphNode, color> &colors,
+                int pid, int nproc, int totalNodes) {
   
+  int startNode = pid * (((float) totalNodes) / nproc);
+  int endNode = (pid + 1) * (((float) totalNodes) / nproc);
+  std::vector<MPI_Request> requests;
+  requests.resize(totalNodes * (nproc - 1));
+  int numReqs = 0;
+  int numRecv = 0;
+
+  // map pids to sets they need
+  
+  // std::vector<graphNode> order;
+  // reorder(startNode, endNode, graph, order);
+
+  std::unordered_set<graphNode> fnbors;
+  std::vector<MPI_Request> recv_reqs;
+  recv_reqs.resize(totalNodes);
+
+  std::unordered_map<graphNode, std::vector<graphNode>> uncolored;
+  std::unordered_map<graphNode, std::vector<graphNode>> smaller;
+
+  for (int i = startNode; i < endNode; i++) {
+    uncolored[i] = {};
+    smaller[i] = {};
+    for (const auto &nbor : graph[i]) {
+      if (nbor >= endNode) {
+        fnbors.insert(nbor);
+        uncolored[i].emplace_back(nbor);
+      } else if (nbor < startNode) {
+        smaller[i].emplace_back(nbor);
+      }
+    }
+    if (uncolored[i].empty()) {
+      uncolored.erase(i);
+    }
+  }
+  // std::cout << "uncolored size: " << uncolored.size() << " for pid " << pid << std::endl;
+
+  for (const auto &fnbor : fnbors) {
+    // std::cout << "addr " << &colors[fnbor] << " for node " << fnbor << std::endl;
+    MPI_Irecv(&colors[fnbor], 1, MPI_INT, nodeToProc(fnbor, totalNodes, nproc), 
+                    fnbor, MPI_COMM_WORLD, &recv_reqs[numRecv++]);
+  }
+  // std::cout << "waiting for " << fnbors.size() << " nbors\n"; 
+
+  int needColor = endNode - startNode;
+
+  for (int node = startNode; node < endNode; node++) {
+    if (uncolored.find(node) != uncolored.end()) continue; 
+    // wait for colors to come in, then assign colors 
+    int color = firstAvailableColor(node, graph, colors);
+    colors[node] = color;
+    
+    std::vector<bool> sent_pids;
+    sent_pids.resize(nproc, false);
+
+    // send color to nbor that needs it and is smaller
+    for (const auto &nbor : smaller[node]) {
+      int send_pid = nodeToProc(nbor, totalNodes, nproc);
+      if (!sent_pids[send_pid]) {
+        MPI_Isend(&colors[node], 1, MPI_INT, send_pid, node, MPI_COMM_WORLD, &requests[numReqs++]);
+        sent_pids[send_pid] = true;
+      }
+    }
+    needColor--;
+  }
+  // std::cout << "sent " << numReqs << " colors\n";
+
+  // std::cout << pid << " pid needs to color " << needColor << std::endl;
+  // int iter = 0;
+  while (needColor > 0) {
+    std::vector<graphNode> toRemove;
+    // if (pid == 0) std::cout << "iter " << iter++ << std::endl;
+    // iter++;
+    for (auto &node : uncolored) {
+      // std::cout << "checking node " << node.first << std::endl;
+      auto fnbor = node.second.begin();
+      while (fnbor != node.second.end()) {
+        // if (iter == 1) std::cout << "checked for " << *fnbor << " at addr " << &colors[*fnbor] << std::endl;
+        if (colors[*fnbor] != -1) {
+          // std::cout << "removed " << *fnbor << " for node " << node.first << std::endl;
+          node.second.erase(fnbor);
+        } else {
+          fnbor++;
+        }
+      }
+      // std::cout << "finished checking " << node.first << std::endl;
+      if (node.second.empty()) {
+        int color = firstAvailableColor(node.first, graph, colors);
+        colors[node.first] = color;
+        // std::cout << "colored " << node.first << " with " << color << std::endl;
+    
+        std::vector<bool> sent_pids;
+        sent_pids.resize(nproc, false);
+
+        // send color to nbor that needs it and is smaller
+        for (const auto &nbor : smaller[node.first]) {
+          int send_pid = nodeToProc(nbor, totalNodes, nproc);
+          if (!sent_pids[send_pid]) {
+            MPI_Isend(&colors[node.first], 1, MPI_INT, send_pid, node.first, MPI_COMM_WORLD, &requests[numReqs++]);
+            sent_pids[send_pid] = true;
+          }
+        }
+        needColor--;
+        toRemove.emplace_back(node.first);
+      }
+    }
+    for (auto &node : toRemove) {
+      uncolored.erase(node);
+    }
+    int flag;
+    MPI_Testall(numRecv, &recv_reqs[0], &flag, MPI_STATUS_IGNORE);
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+}
+
+
 int main(int argc, char *argv[]) {
   
   // MPI initialization:
@@ -174,14 +343,12 @@ int main(int argc, char *argv[]) {
     readGraphFromFile(options.inputFile, nodes, pairs);
   }
   
-  // Start timer
-  MPI_Barrier(MPI_COMM_WORLD);
-  Timer t;
-  t.reset();
+  MPI_Datatype MPI_PAIR;
+  MPI_Type_contiguous(2, MPI_INT, &MPI_PAIR);
+  MPI_Type_commit(&MPI_PAIR);
 
   // Broadcast number of nodes and pairs of nodes
   int numNodes = (int) nodes.size();
-  std::cout << nodes.size() << std::endl;
   MPI_Bcast(&numNodes, 1, MPI_INT, 0, MPI_COMM_WORLD); 
 
   int numPairs = (int) pairs.size();
@@ -192,26 +359,31 @@ int main(int argc, char *argv[]) {
       nodes.resize(numNodes);
       pairs.resize(numPairs);
   }
-  // std::cerr << "hello i am " << pid << "! i have " << numNodes << " nodes and " << numPairs << " pairs\n";
 
   // Broadcast nodes and pairs from head to task processes
   MPI_Bcast(&nodes[0], numNodes, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&pairs[0], numPairs, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&pairs[0], numPairs, MPI_PAIR, 0, MPI_COMM_WORLD);
   // Now all processors know the nodes and the pairs/edges
 
   // Each processor builds the full graph
   std::unordered_map<graphNode, std::vector<graphNode>> graph;
   buildGraph(nodes, pairs, graph);
 
-  std::cout << nproc << ", " << numNodes << std::endl;
+  
+  std::unordered_map<graphNode, color> colors;
+  for (const auto &node : nodes) {
+    colors[node] = - 1;
+  }
+  
+  // Start timer
+  MPI_Barrier(MPI_COMM_WORLD);
+  Timer t;
+  t.reset();
+
 
   // Start head and task processes
   // Head allocates a chunk of nodes that each task process colors
-  auto colors = colorNodes(graph, pid, nproc, numNodes);
-  
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  std::cout << pid << ": " << colors.size() << std::endl;
+  colorNodes(graph, colors, pid, nproc, numNodes);
   
   int startNode = pid * (((float) numNodes) / nproc);
   int endNode = (pid + 1) * (((float) numNodes) / nproc);
@@ -220,13 +392,15 @@ int main(int argc, char *argv[]) {
   for (int i = startNode; i < endNode; i++) {
     int index = 2 * (i - startNode);
     colorArray[index] = i;
-    colorArray[index++] = colors[i];
+    colorArray[index + 1] = colors[i];
   }
 
   int chunkSizes[nproc];
   int startPos[nproc];
   startPos[0] = 0;
   chunkSizes[0] = ((float) numNodes) / nproc;
+  chunkSizes[0] *= 2;
+
   for (int i = 1; i < nproc; i++) {
     int start = i * (((float) numNodes) / nproc);
     int end = (i + 1) * (((float) numNodes) / nproc);
