@@ -130,11 +130,6 @@ int main(int argc, char *argv[]) {
     readGraphFromFile(options.inputFile, nodes, pairs);
   }
 
-  // Start timer
-  MPI_Barrier(MPI_COMM_WORLD);
-  Timer t;
-  t.reset();
-
   // Broadcast number of nodes and pairs of nodes
   int numNodes = (int) nodes.size();
   MPI_Bcast(&numNodes, 1, MPI_INT, 0, MPI_COMM_WORLD); 
@@ -165,6 +160,11 @@ int main(int argc, char *argv[]) {
   
   // Each processor has nodes + graph now
   // TODO: assume num nodes divisible by num procs for now, fix remainder later
+
+  // Start timer
+  MPI_Barrier(MPI_COMM_WORLD);
+  Timer t;
+  t.reset();
   
   #pragma region partition
   // using "natural" ordering (has implicit mapping of nodes to processors)
