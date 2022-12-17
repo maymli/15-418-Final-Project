@@ -27,7 +27,6 @@ f1.close()
 # |V| = 50,000, |E| = 250,000,000
 f1 = open("random-50000.txt", "w")
 f1.write("50000\n")
-
 pairs_count = 0
 while pairs_count < 250000000:
     first = random.randrange(0, 50000)
@@ -52,12 +51,12 @@ f1.close()
 
 # Test 5: sparse-500000
 # |V| = 500,000, |E| = 10,000,000
-f1 = open("sparse-50000.txt", "w")
+f1 = open("sparse-500000.txt", "w")
 f1.write("500000\n")
 pairs_count = 0
 while pairs_count < 10000000:
-    first = random.randrange(0, 5000)
-    second = random.randrange(0, 5000)
+    first = random.randrange(0, 500000)
+    second = random.randrange(0, 500000)
     if first != second:
         f1.write(str(first) + " " + str(second) + "\n")
         pairs_count += 1
@@ -110,8 +109,8 @@ for k in range(5):
             pairs_count += 1
 f1.close()
 
-# Test 9: components-5000
-# |V| = 5,000, |E| = 10,000,000 (5 highly-connected components of 2,000,000 edges)
+# Test 9: components-50000
+# |V| = 50,000, |E| = 10,000,000 (5 highly-connected components of 2,000,000 edges)
 f1 = open("components-50000.txt", "w")
 f1.write("50000\n")
 for k in range(5):
