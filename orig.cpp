@@ -59,34 +59,52 @@ public:
     }
 
     int numWrong = 0;
-    #pragma omp parallel for schedule(dynamic, 2) shared(graph, colors, numWrong)
+    bool correct[numNodes];
+
+    #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
     for (int i = 0; i < numNodes; i++) {
+      correct[i] = true;
       color c = colors[i];
       for (const auto &nbor : graph[i]) {
-        if (colors[nbor] == c && i < nbor) {
-          colors[i] = -1;
-	  #pragma omp atomic
-	  numWrong++;
+        if (colors[nbor] == c) {
+          correct[i] = false;
+          #pragma omp atomic
+          numWrong++;
           break;
-	}
+        }
       }
     }
-
+        
     while (numWrong > 0) {
-      #pragma omp parallel for schedule(dynamic, 2) shared(graph, colors, numWrong)
+      #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
       for (int i = 0; i < numNodes; i++) {
-        if (colors[i] == -1) {
+        if (!correct[i]) {
           bool colorNow = true;
           for (const auto &nbor : graph[i]) {
-            if (colors[nbor] == -1 && i < nbor) {
+            if (!correct[nbor] && i < nbor) {
               colorNow = false;
               break;
             }
           }
           if (colorNow) {
             colors[i] = firstAvailableColor(i, graph, colors);
-            #pragma omp atomic
-            numWrong--;
+          }
+
+        }
+      }
+      numWrong = 0;
+      #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
+      for (int i = 0; i < numNodes; i++) {
+        if (!correct[i]) {
+          correct[i] = true;
+          color c = colors[i];
+          for (const auto &nbor : graph[i]) {
+            if (colors[nbor] == c) {
+              correct[i] = false;
+              #pragma omp atomic
+              numWrong++;
+              break;
+            }
           }
         }
       }

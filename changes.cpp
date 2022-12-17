@@ -59,36 +59,54 @@ public:
     }
 
     int numWrong = 0;
-    #pragma omp parallel for schedule(dynamic, 2) shared(graph, colors, numWrong)
+    int correct[numNodes];
+
+    #pragma omp parallel for shared(graph, correct, colors, numWrong)
     for (int i = 0; i < numNodes; i++) {
+      correct[i] = 0;
       color c = colors[i];
+      bool larger = true;
       for (const auto &nbor : graph[i]) {
-        if (colors[nbor] == c && i < nbor) {
-          colors[i] = -1;
-	  #pragma omp atomic
-	  numWrong++;
-          break;
-	}
+        if (colors[nbor] == c) {
+          correct[i] = 1;
+	  larger = larger && i > nbor;
+        }
+      }
+      if (correct[i] == 1 && larger) {
+	correct[i] = 2;
+	#pragma omp atomic
+	numWrong++;
       }
     }
-
+        
     while (numWrong > 0) {
-      #pragma omp parallel for schedule(dynamic, 2) shared(graph, colors, numWrong)
+      #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
       for (int i = 0; i < numNodes; i++) {
-        if (colors[i] == -1) {
-          bool colorNow = true;
-          for (const auto &nbor : graph[i]) {
-            if (colors[nbor] == -1 && i < nbor) {
-              colorNow = false;
-              break;
+        if (correct[i] == 2) {
+          colors[i] = firstAvailableColor(i, graph, colors);
+          correct[i] = 0;
+	}
+      }
+      numWrong = 0;
+
+      #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
+      for (int i = 0; i < numNodes; i++) {
+        // if (correct[i] != 0) {
+	  correct[i] = 0;
+      	  color c = colors[i];
+      	  bool larger = true;
+      	  for (const auto &nbor : graph[i]) {
+            if (colors[nbor] == c) {
+	      larger = larger && i > nbor;
+              correct[i] = 1;
             }
           }
-          if (colorNow) {
-            colors[i] = firstAvailableColor(i, graph, colors);
-            #pragma omp atomic
-            numWrong--;
+          if (correct[i] == 1 && larger) {
+	    correct[i] = 2;
+	    #pragma omp atomic
+	    numWrong++;
           }
-        }
+	// }
       }
     }
   }
