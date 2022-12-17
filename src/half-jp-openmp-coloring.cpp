@@ -59,53 +59,54 @@ public:
     }
 
     int numWrong = 0;
-    bool correct[numNodes];
+    int correct[numNodes];
 
-    #pragma omp parallel for shared(graph, colors)
+    #pragma omp parallel for shared(graph, correct, colors, numWrong)
     for (int i = 0; i < numNodes; i++) {
-      correct[i] = true;
+      correct[i] = 0;
       color c = colors[i];
+      bool larger = true;
       for (const auto &nbor : graph[i]) {
         if (colors[nbor] == c) {
-          correct[i] = false;
-          #pragma omp atomic
-          numWrong++;
-          break;
+	  larger = larger && i > nbor;
+          correct[i] = 1;
         }
+      }
+      if (correct[i] == 1 && larger) {
+	correct[i] = 2;
+	#pragma omp atomic
+	numWrong++;
       }
     }
         
     while (numWrong > 0) {
-      #pragma omp parallel for schedule(dynamic, 2) shared(graph, colors, correct, numWrong)
+      #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
       for (int i = 0; i < numNodes; i++) {
-        if (!correct[i]) {
-          bool colorNow = true;
-          for (const auto &nbor : graph[i]) {
-            if (!correct[nbor] && i < nbor) {
-              colorNow = false;
-              break;
-            }
-          }
-          if (colorNow) {
-            colors[i] = firstAvailableColor(i, graph, colors);
-          }
-
-        }
+        if (correct[i] == 2) {
+          colors[i] = firstAvailableColor(i, graph, colors);
+          correct[i] = 0;
+	}
       }
       numWrong = 0;
+
+      #pragma omp parallel for schedule(dynamic, 12) shared(graph, colors, correct, numWrong)
       for (int i = 0; i < numNodes; i++) {
-        if (!correct[i]) {
-          correct[i] = true;
-          color c = colors[i];
-          for (const auto &nbor : graph[i]) {
+        if (correct[i] == 1) {
+	  correct[i] = 0;
+      	  color c = colors[i];
+      	  bool larger = true;
+      	  for (const auto &nbor : graph[i]) {
             if (colors[nbor] == c) {
-              correct[i] = false;
-              #pragma omp atomic
-              numWrong++;
-              break;
+	      larger = larger && i > nbor;
+              correct[i] = 1;
             }
           }
-        }
+          if (correct[i] == 1 && larger) {
+	    correct[i] = 2;
+	    #pragma omp atomic
+	    numWrong++;
+          }
+	}
       }
     }
   }
