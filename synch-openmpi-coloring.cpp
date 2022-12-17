@@ -2,6 +2,7 @@
 #include "mpi.h"
 #include "src/timing.h"
 
+
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -143,7 +144,11 @@ int firstAvailableColor(int node, std::unordered_map<graphNode, std::vector<grap
 }
 
 int nodeToProc(graphNode node, int totalNodes, int nproc) {
-  return (int) (node / (((float) totalNodes) / nproc));
+  int pid = (node / (((float) totalNodes) / nproc));
+  int endNode = (pid + 1) * (((float) totalNodes) / nproc);
+  if (pid != nproc - 1 && node >= endNode) pid++;
+
+  return pid;
 }
 
 /* void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
@@ -153,7 +158,7 @@ int nodeToProc(graphNode node, int totalNodes, int nproc) {
   int startNode = pid * (((float) totalNodes) / nproc);
   int endNode = (pid + 1) * (((float) totalNodes) / nproc);
   std::vector<MPI_Request> requests;
-  requests.resize(totalNodes);
+  // requests.resize(totalNodes);
   int numReqs = 0;
   int numWait = 0;
 
@@ -162,8 +167,8 @@ int nodeToProc(graphNode node, int totalNodes, int nproc) {
   std::vector<graphNode> order;
   reorder(startNode, endNode, graph, order);
 
- // for (int node = startNode; node < endNode; node++) {
- for (auto &node : order) {
+ for (int node = startNode; node < endNode; node++) {
+ // for (auto &node : order) {
     std::vector<graphNode> smallerNbors;
     std::vector<graphNode> largerNbors;
     for (const auto &nbor : graph[node]) {
@@ -195,13 +200,13 @@ int nodeToProc(graphNode node, int totalNodes, int nproc) {
     for (const auto &nbor : smallerNbors) {
       int send_pid = nodeToProc(nbor, totalNodes, nproc);
       if (!sent_pids[send_pid]) {
+	requests.emplace_back();
         MPI_Isend(&colors[node], 1, MPI_INT, send_pid, node, MPI_COMM_WORLD, &requests[numReqs++]);
         sent_pids[send_pid] = true;
       }
     }
   }
-
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Waitall(numReqs, &requests[0], MPI_STATUS_IGNORE);
 } */
 
 void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
@@ -211,14 +216,8 @@ void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
   int startNode = pid * (((float) totalNodes) / nproc);
   int endNode = (pid + 1) * (((float) totalNodes) / nproc);
   std::vector<MPI_Request> requests;
-  requests.resize(totalNodes * (nproc - 1));
   int numReqs = 0;
   int numRecv = 0;
-
-  // map pids to sets they need
-  
-  // std::vector<graphNode> order;
-  // reorder(startNode, endNode, graph, order);
 
   std::unordered_set<graphNode> fnbors;
   std::vector<MPI_Request> recv_reqs;
@@ -242,14 +241,11 @@ void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
       uncolored.erase(i);
     }
   }
-  // std::cout << "uncolored size: " << uncolored.size() << " for pid " << pid << std::endl;
 
   for (const auto &fnbor : fnbors) {
-    // std::cout << "addr " << &colors[fnbor] << " for node " << fnbor << std::endl;
     MPI_Irecv(&colors[fnbor], 1, MPI_INT, nodeToProc(fnbor, totalNodes, nproc), 
                     fnbor, MPI_COMM_WORLD, &recv_reqs[numRecv++]);
   }
-  // std::cout << "waiting for " << fnbors.size() << " nbors\n"; 
 
   int needColor = endNode - startNode;
 
@@ -266,45 +262,36 @@ void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
     for (const auto &nbor : smaller[node]) {
       int send_pid = nodeToProc(nbor, totalNodes, nproc);
       if (!sent_pids[send_pid]) {
+	requests.emplace_back();
         MPI_Isend(&colors[node], 1, MPI_INT, send_pid, node, MPI_COMM_WORLD, &requests[numReqs++]);
         sent_pids[send_pid] = true;
       }
     }
     needColor--;
   }
-  // std::cout << "sent " << numReqs << " colors\n";
 
-  // std::cout << pid << " pid needs to color " << needColor << std::endl;
-  // int iter = 0;
   while (needColor > 0) {
     std::vector<graphNode> toRemove;
-    // if (pid == 0) std::cout << "iter " << iter++ << std::endl;
-    // iter++;
     for (auto &node : uncolored) {
-      // std::cout << "checking node " << node.first << std::endl;
       auto fnbor = node.second.begin();
       while (fnbor != node.second.end()) {
-        // if (iter == 1) std::cout << "checked for " << *fnbor << " at addr " << &colors[*fnbor] << std::endl;
         if (colors[*fnbor] != -1) {
-          // std::cout << "removed " << *fnbor << " for node " << node.first << std::endl;
           node.second.erase(fnbor);
         } else {
           fnbor++;
         }
       }
-      // std::cout << "finished checking " << node.first << std::endl;
       if (node.second.empty()) {
         int color = firstAvailableColor(node.first, graph, colors);
         colors[node.first] = color;
-        // std::cout << "colored " << node.first << " with " << color << std::endl;
     
         std::vector<bool> sent_pids;
         sent_pids.resize(nproc, false);
 
-        // send color to nbor that needs it and is smaller
         for (const auto &nbor : smaller[node.first]) {
           int send_pid = nodeToProc(nbor, totalNodes, nproc);
           if (!sent_pids[send_pid]) {
+	    requests.emplace_back();
             MPI_Isend(&colors[node.first], 1, MPI_INT, send_pid, node.first, MPI_COMM_WORLD, &requests[numReqs++]);
             sent_pids[send_pid] = true;
           }
@@ -319,8 +306,8 @@ void colorNodes(std::unordered_map<graphNode, std::vector<graphNode>> &graph,
     int flag;
     MPI_Testall(numRecv, &recv_reqs[0], &flag, MPI_STATUS_IGNORE);
   }
-
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Waitall(numRecv, &recv_reqs[0], MPI_STATUS_IGNORE);
+  MPI_Waitall(numReqs, &requests[0], MPI_STATUS_IGNORE);
 }
 
 
