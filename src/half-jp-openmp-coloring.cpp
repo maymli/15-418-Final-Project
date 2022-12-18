@@ -65,10 +65,10 @@ public:
       for (const auto &nbor : graph[i]) {
         if (colors[nbor] == c && i < nbor) {
           colors[i] = -1;
-	  #pragma omp atomic
-	  numWrong++;
+	      #pragma omp atomic
+	      numWrong++;
           break;
-	}
+	    }
       }
     }
 

@@ -54,7 +54,6 @@ public:
     // also we'll need to change this into a vector to iterat through with pragma
    
     int numNodes = (int) graph.size(); 
-    std::cout << numNodes << std::endl;
     for (int i = 0; i < numNodes; i++) {
       colors[i] = -1;
     }
