@@ -1,5 +1,6 @@
 import random
 
+'''
 # Test 1: complete-5000
 # |V| = 5,000, |E| = 12,497,500
 f1 = open("complete-5000.txt", "w")
@@ -8,8 +9,9 @@ for i in range(5000):
     for j in range(i + 1, 5000):
         f1.write(str(i) + " " + str(j) + "\n")
 f1.close()
+'''
 
-
+'''
 # Test 2: random-5000
 # |V| = 5,000, |E| = 2,500,000
 f1 = open("random-5000.txt", "w")
@@ -22,7 +24,9 @@ while pairs_count < 2500000:
         f1.write(str(first) + " " + str(second) + "\n")
         pairs_count += 1
 f1.close()
+'''
 
+'''
 # Test 3: random-50000
 # |V| = 50,000, |E| = 250,000,000
 f1 = open("random-50000.txt", "w")
@@ -35,6 +39,8 @@ while pairs_count < 250000000:
         f1.write(str(first) + " " + str(second) + "\n")
         pairs_count += 1
 f1.close()
+'''
+
 
 # Test 4: sparse-50000
 # |V| = 50,000, |E| = 1,000,000
@@ -49,6 +55,7 @@ while pairs_count < 1000000:
         pairs_count += 1
 f1.close()
 
+'''
 # Test 5: sparse-500000
 # |V| = 500,000, |E| = 10,000,000
 f1 = open("sparse-500000.txt", "w")
@@ -124,3 +131,4 @@ for k in range(5):
             f1.write(str(first) + " " + str(second) + "\n")
             pairs_count += 1
 f1.close()
+'''
