@@ -1,6 +1,6 @@
 OUTPUTDIR := bin/
 
-CFLAGS := -std=c++14 -fvisibility=hidden -lpthread
+CFLAGS := -std=c++14 -fvisibility=hidden -lpthread -Wall
 
 ifeq (,$(CONFIGURATION))
 	CONFIGURATION := release
@@ -15,7 +15,7 @@ CFLAGS += -O2 -fopenmp
 endif
 
 ifeq (MPI, $(CONFIGURATION))
-SOURCES = openmpi-coloring.cpp
+SOURCES = openmpi-coloringv2.cpp
 else
 SOURCES := src/*.cpp
 endif
@@ -24,7 +24,19 @@ HEADERS := src/*.h
 ifeq (MPI, $(CONFIGURATION))
 CXX = mpic++
 endif
- 
+
+ifeq (MPI2, $(CONFIGURATION))
+SOURCES = synch-openmpi-coloring.cpp
+else
+SOURCES := src/*.cpp
+endif
+HEADERS := src/*.h
+
+ifeq (MPI2, $(CONFIGURATION))
+CXX = mpic++
+endif
+
+
 TARGETBIN := color-$(CONFIGURATION)
 
 .SUFFIXES:
