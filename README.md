@@ -5,7 +5,7 @@
 
 The graph coloring problem involves finding a color for each node such that none of its neighbors have that same color. Practical applications of graph coloring include scheduling, register allocation for compiler optimization, and more. In a graph with N nodes, the graph coloring problem can be trivially solved by assigning each node their own unique color, resulting in N colors being used. The minimum graph coloring problem involves finding an assignment of colors to nodes that results in the least number of colors used. 
 
-In our approach to parallelize graph coloring, we will implement a parallel algorithm using OpenMP and OpenMPI. See more about our proposal, milestone report, and final report below.
+In our approach to parallelize graph coloring, we will implement a parallel algorithm using OpenMP and OpenMPI. See more about our proposal, milestone report, and final report below for results.
 
 # Implementations
 
@@ -21,7 +21,7 @@ The first of these implementations uses a shared color map, and each thread colo
 
 The second of these implementations implements the Jones-Plassman algorithm, coloring an independent set of vertices in paralell for each iteration until all nodes are colored. This colors the nodes optimally but achieves poor speedup.
 
-The third of these implementations implements a combination of the two, in which it takes the approach of the first one and resolves conflicts with the Jones-Plassman algorithm.
+The third of these implementations implements a combination of the two, in which it takes the approach of the first one and resolves conflicts with the Jones-Plassman algorithm. The implementation achieves high speedup and near-optimal coloring.
 
 To run these, instead of the `-seq` flag, run with either the `-openmp`, `-jpop`, or `-half` flags respectively.
 
@@ -29,7 +29,7 @@ To run these, instead of the `-seq` flag, run with either the `-openmp`, `-jpop`
 
 There are 4 OpenMP implemenentations, and to compile them, run `make CONFIGURATION=MPI` or `make CONFIGURATION=MPI2` to run the synchronous MPI coloring.
 
-One implementation is synch-openmpi-coloring.cpp, which attempts to color the graph by requesting colors from its neighbors asynchronously and coloring as long as a node has the colors of its neighbors.
+One implementation is synch-openmpi-coloring.cpp, which attempts to color the graph by requesting colors from its neighbors asynchronously and coloring as long as a node has the colors of its neighbors. This implementation achieves optimal coloring but poor speedup.
 
 ## Reports
 
