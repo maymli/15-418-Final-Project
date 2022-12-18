@@ -171,7 +171,14 @@ int main(int argc, char *argv[]) {
   // also assuming node = i in nodes
   int nodeChunkSize = numNodes / nproc;
   int start = nodeChunkSize * pid;
-  int end = nodeChunkSize * (pid + 1);
+  int end;
+  if (pid == nproc - 1) {
+    end = numNodes;
+  }
+  else {
+    end = nodeChunkSize * (pid + 1);
+  }
+  int thisNodeChunkSize = end - start;
   
   std::vector<graphNode> nodesToColor;
   for (int i = start; i < end; i ++) {
@@ -184,7 +191,7 @@ int main(int argc, char *argv[]) {
   int proc;
   for (auto node : nodesToColor) {
     for (auto nbor : graph[node]) {
-      proc = nbor / nodeChunkSize;
+      proc = std::min(nbor / nodeChunkSize, nproc - 1);
       if (proc != pid) {
         // then node is a boundary node, whose nbor is in proc
         if (boundaryMap.find(node) == boundaryMap.end()) {
@@ -337,14 +344,27 @@ int main(int argc, char *argv[]) {
 
   // gather all node colors (insignificant time cost)
   std::vector<color> finalColors;
-  finalColors.resize(nodeChunkSize);
+  finalColors.resize(thisNodeChunkSize);
   for (int i = start; i < end; i ++) {
     finalColors[i - start] = colors[nodes[i]];
   }
 
   std::vector<color> rootColors;
   rootColors.resize(numNodes);
-  MPI_Gather(&finalColors[0], nodeChunkSize, MPI_INT, &rootColors[0], nodeChunkSize, MPI_INT, 0, MPI_COMM_WORLD);
+
+  std::vector<int> lengths;
+  std::vector<int> disps;
+  for (int proc = 0; proc < nproc; proc ++) {
+    if (proc == nproc - 1) {
+      lengths.push_back(numNodes - (proc * (numNodes / nproc)));
+    }
+    else {
+      lengths.push_back(thisNodeChunkSize);
+    }
+    
+    disps.push_back(proc * (numNodes / nproc));
+  }
+  MPI_Gatherv(&finalColors[0], thisNodeChunkSize, MPI_INT, &rootColors[0], &lengths[0], &disps[0], MPI_INT, 0, MPI_COMM_WORLD);
 
   if (pid == 0) {
     for (int i = 0; i < numNodes; i ++) {
